@@ -326,14 +326,15 @@ def get_fun_fact(today):
 
 
 def build_message(soups, mains, date_str, weather, stock, name_day, transit_alerts, fun_fact):
-    lines = [f"📅 **Denní menu U Krkovice – {date_str}**"]
+    lines = [f"📅 **Dobré ráno – {date_str}**"]
     if name_day:
         lines.append(f"🎉 Dnes má svátek: **{name_day}**")
     lines.append("")
 
-    if not soups and not mains:
-        lines.append("Dnes není k dispozici denní menu (pravděpodobně víkend nebo aktualizace stránky).")
-    else:
+    # Menu is only added on days U Krkovice actually publishes one (skips weekends).
+    if soups or mains:
+        lines.append("**🍴 Denní menu U Krkovice**")
+
         if soups:
             lines.append("**🍲 Polévky**")
             for name, desc, price in soups:
