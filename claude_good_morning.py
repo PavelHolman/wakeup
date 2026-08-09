@@ -79,13 +79,20 @@ def fetch_menu_items(section_name, item_prefix, price_prefix):
     soup = BeautifulSoup(response.content, "html.parser")
 
     date_str = None
+    menu_date = None
     time_tag = soup.find("time")
     if time_tag:
         date_str = time_tag.get_text(strip=True)
+        iso = time_tag.get("datetime")
+        if iso:
+            try:
+                menu_date = datetime.fromisoformat(iso.replace("Z", "+00:00")).date()
+            except ValueError:
+                pass
 
     section = soup.find(attrs={"data-framer-name": section_name})
     if section is None:
-        return [], date_str
+        return [], date_str, menu_date
 
     def matches(tag, prefix):
         return tag.name == "div" and tag.get("data-framer-name", "").startswith(prefix)
@@ -107,7 +114,7 @@ def fetch_menu_items(section_name, item_prefix, price_prefix):
             continue
         items.append((name, desc, price))
 
-    return items, date_str
+    return items, date_str, menu_date
 
 
 DAYPARTS = [
@@ -405,10 +412,18 @@ def main():
     date_str = today.strftime("%-d. %-m. %Y")
 
     try:
-        soups, page_date = fetch_menu_items("Polévky", "Polívka + popis", "Cena polívky")
-        mains, _ = fetch_menu_items("Denní nabídka", "Denní jídlo + popis", "Cena denního jídla")
-        if page_date:
-            date_str = page_date
+        soups, _, menu_date = fetch_menu_items("Polévky", "Polívka + popis", "Cena polívky")
+        mains, _, _ = fetch_menu_items("Denní nabídka", "Denní jídlo + popis", "Cena denního jídla")
+        # U Krkovice leaves the last weekday's menu up over the weekend, so an
+        # empty menu isn't the signal for "no menu today" — a stale date is.
+        # Only show the menu when its own date matches today.
+        if menu_date != today.date():
+            if menu_date is not None:
+                print(
+                    f"Menu date {menu_date} != today {today.date()}; omitting stale menu.",
+                    file=sys.stderr,
+                )
+            soups, mains = [], []
     except Exception as exc:
         print(f"Failed to fetch/parse menu: {exc}", file=sys.stderr)
         soups, mains = [], []
