@@ -273,20 +273,47 @@ def fetch_transit_alerts(today):
     return alerts
 
 
+FUN_FACT_THEMES = [
+    "vědy nebo techniky",
+    "umění, hudby nebo filmu",
+    "sportu",
+    "objevů a cestovatelství",
+    "vesmíru a astronomie",
+    "kultury nebo literatury",
+    "vynálezů a technologií",
+    "přírody nebo zvířat",
+    "architektury nebo stavitelství",
+    "každodenního života a kuriozit",
+]
+
+
 def get_fun_fact_from_claude(today):
     """Ask the claude CLI for a fun fact. Returns the text, or None if the
     CLI call fails (e.g. expired OAuth session) so a fallback can kick in."""
+    theme = random.choice(FUN_FACT_THEMES)
     prompt = (
-        f"Napiš jednu krátkou zajímavost (1-2 věty, česky) o tom, co se stalo "
-        f"v historii {today.day}. {today.month}. Piš pouze samotný text "
-        f"zajímavosti, bez úvodu, bez uvozovek."
+        f"Napiš jednu zábavnou a vtipnou zajímavost (1-2 věty, česky) o události "
+        f"z historie, která se stala {today.day}. {today.month}. (v kterémkoli roce), "
+        f"ideálně z oblasti {theme}. Podej to s humorem, klidně s vtipnou pointou "
+        f"nebo odlehčeným komentářem, ať se u toho člověk ráno pousměje. "
+        f"Vyhni se tématům druhé světové války a válek obecně, ať jsou zajímavosti "
+        f"pestré. Pokud v dané oblasti nic zajímavého nemáš, vyber jakoukoli jinou "
+        f"nenásilnou zajímavost k tomuto datu – nikdy neodmítej. Piš pouze samotný "
+        f"text zajímavosti, bez úvodu, bez uvozovek."
     )
-    result = subprocess.run(
-        ["claude", "-p", prompt, "--model", "claude-haiku-4-5"],
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
+    try:
+        result = subprocess.run(
+            # --allowedTools none: whitelist a non-existent tool so no real tools
+            # are available. Otherwise the model tries web search, hits a permission
+            # block in non-interactive mode, and narrates it into the output.
+            ["claude", "-p", prompt, "--model", "claude-haiku-4-5", "--allowedTools", "none"],
+            capture_output=True,
+            text=True,
+            timeout=90,
+        )
+    except subprocess.TimeoutExpired:
+        print("claude CLI fun fact timed out after 90s", file=sys.stderr)
+        return None
     fact = result.stdout.strip()
     if result.returncode != 0 or not fact:
         print(
