@@ -140,6 +140,28 @@ Caveats:
 - Works reliably on AC power, including with the lid closed.
 - On battery, macOS doesn't 100% guarantee scheduled wake on every model/macOS version — it's the best mechanism available locally, but not an absolute guarantee. If that matters, running this in the cloud (e.g. a scheduled GitHub Actions workflow) removes the dependency on the laptop's power/sleep state entirely, at the cost of needing a separate Anthropic API key for the `claude` CLI step (your Claude subscription login won't work in a headless CI runner).
 
+## Running on an always-on Mac (e.g. a Mac Mini)
+
+If you run this on a Mac that stays on 24/7 (a Mac Mini used as a home server is ideal), the setup is simpler and more reliable than on a laptop — skip the scheduled-wake hack in step 7 entirely and just prevent sleep instead:
+
+```bash
+sudo pmset -a sleep 0 disksleep 0
+```
+
+Everything else is identical: same `launchd` plist (step 6), same `.env`, same `claude` CLI subscription login. Unlike a headless CI runner, a persistent Mac keeps the `claude` OAuth session, so no Anthropic API key is needed. A few things worth checking on the new machine:
+
+- **Python path**: set `PYTHON_BIN` in `claude_good_morning.sh` to that machine's `which python3` (a Homebrew install lands at `/opt/homebrew/bin/python3`, not the python.org framework path).
+- **`claude` login**: run `claude` once interactively and `/login` so the launchd job (running as your user) reuses the session.
+- **Timezone**: `launchd` fires at 9:00 *local* wall-clock — confirm the machine's timezone with `sudo systemsetup -gettimezone`.
+
+To decommission the old machine, unload and remove its job, then clear the wake schedule:
+
+```bash
+launchctl unload -w ~/Library/LaunchAgents/com.<you>.goodmorning.plist
+rm ~/Library/LaunchAgents/com.<you>.goodmorning.plist
+sudo pmset repeat cancel
+```
+
 ## Files
 
 | File | Purpose |
